@@ -1,5 +1,6 @@
 const ringCircumference = 2 * Math.PI * 52;
 const maxCueVolume = 2;
+const warmupSeconds = 5;
 const fallbackPanelColor = "#d94f66";
 const fallbackPresetColor = "#0f776e";
 
@@ -289,6 +290,9 @@ const presets = [
 
 const elements = {
   presetName: requiredElement("#presetName"),
+  phaseProgressBadge: requiredElement("#phaseProgressBadge"),
+  phaseProgressText: requiredElement("#phaseProgressText"),
+  phaseProgressLabel: requiredElement("#phaseProgressLabel"),
   favoriteButton: requiredElement("#favoriteButton"),
   timeRemaining: requiredElement("#timeRemaining"),
   phaseName: requiredElement("#phaseName"),
@@ -470,7 +474,17 @@ function clampCueVolume(value) {
 }
 
 function buildPhases(preset) {
-  const phases = [];
+  const phases = [
+    {
+      label: "Get ready",
+      seconds: warmupSeconds,
+      kind: "warmup",
+      round: 0,
+      roundCount: preset.rounds,
+      startsAt: 0,
+      endsAt: 0,
+    },
+  ];
   for (let round = 1; round <= preset.rounds; round += 1) {
     preset.intervals.forEach((interval, intervalIndex) => {
       const isLastInterval = intervalIndex === preset.intervals.length - 1;
@@ -603,8 +617,10 @@ function startTimer() {
   void requestWakeLock();
   const { index, phase } = getCurrentPhase();
   state.lastPhaseIndex = index;
-  void playCue(phase?.kind === "rest" ? "rest" : "work");
-  vibrate(phase?.kind === "rest" ? 30 : 50);
+  if (phase?.kind !== "warmup") {
+    void playCue(phase?.kind === "rest" ? "rest" : "work");
+    vibrate(phase?.kind === "rest" ? 30 : 50);
+  }
   tick();
 }
 
@@ -670,8 +686,10 @@ function tick() {
 
   if (index !== state.lastPhaseIndex && phase) {
     state.lastPhaseIndex = index;
-    void playCue(phase.kind === "rest" ? "rest" : "work");
-    vibrate(phase.kind === "rest" ? [20] : [45, 30, 45]);
+    if (phase.kind !== "warmup") {
+      void playCue(phase.kind === "rest" ? "rest" : "work");
+      vibrate(phase.kind === "rest" ? [20] : [45, 30, 45]);
+    }
   }
 
   if (elapsed >= state.totalSeconds && !state.complete) {
@@ -710,12 +728,19 @@ function render() {
   const { phase, index } = getCurrentPhase(elapsed);
   const phaseRemaining = phase ? Math.max(0, phase.endsAt - elapsed) : 0;
   const totalProgress = state.totalSeconds > 0 ? elapsed / state.totalSeconds : 0;
+  const badge = phaseProgressBadgeText(phase);
 
   elements.presetName.textContent = state.activePreset.name;
   elements.phaseName.textContent = state.complete ? "Complete" : phase?.label ?? "Ready";
   elements.roundInfo.textContent = state.complete
-    ? `${state.phases.length}/${state.phases.length} intervals`
+    ? `${countActivePhases()}/${countActivePhases()} intervals`
     : phaseProgressText(phase, index);
+  elements.phaseProgressText.textContent = state.complete ? badge.completeText : badge.text;
+  elements.phaseProgressLabel.textContent = state.complete ? badge.completeLabel : badge.label;
+  elements.phaseProgressBadge.setAttribute(
+    "aria-label",
+    state.complete ? badge.completeAccessibleText : badge.accessibleText,
+  );
   elements.timeRemaining.textContent = state.complete ? "00:00" : formatTime(phaseRemaining);
   elements.timeRemaining.classList.toggle("long", elements.timeRemaining.textContent.length > 5);
   elements.elapsedTime.textContent = formatTime(elapsed);
@@ -748,13 +773,60 @@ function phaseProgressText(phase, index) {
   if (!phase) {
     return "Ready";
   }
-  if (phase.roundCount === 1 && state.phases.length === 1) {
+  if (phase.kind === "warmup") {
+    return "start countdown";
+  }
+  if (phase.roundCount === 1 && countActivePhases() === 1) {
     return "single timer";
   }
   if (phase.roundCount === 1) {
-    return `${index + 1}/${state.phases.length} interval`;
+    return `${activePhaseIndex(index) + 1}/${countActivePhases()} interval`;
   }
   return `${phase.round}/${phase.roundCount} rep`;
+}
+
+function countActivePhases() {
+  return state.phases.filter((phase) => phase.kind !== "warmup").length;
+}
+
+function activePhaseIndex(index) {
+  return state.phases.slice(0, index + 1).filter((phase) => phase.kind !== "warmup").length - 1;
+}
+
+function phaseProgressBadgeText(phase) {
+  const activeRounds = state.activePreset.rounds;
+  if (!phase) {
+    return {
+      text: "0/" + activeRounds,
+      label: "rep",
+      accessibleText: `Ready. 0 out of ${activeRounds} reps.`,
+      completeText: activeRounds + "/" + activeRounds,
+      completeLabel: "done",
+      completeAccessibleText: `Complete. ${activeRounds} out of ${activeRounds} reps.`,
+    };
+  }
+
+  const total = phase.roundCount || activeRounds;
+  if (phase.kind === "warmup") {
+    return {
+      text: "0/" + total,
+      label: "ready",
+      accessibleText: `Get ready. 0 out of ${total} reps.`,
+      completeText: total + "/" + total,
+      completeLabel: "done",
+      completeAccessibleText: `Complete. ${total} out of ${total} reps.`,
+    };
+  }
+
+  const current = Math.max(1, phase.round || 1);
+  return {
+    text: current + "/" + total,
+    label: total === 1 ? "timer" : "rep",
+    accessibleText: `${current} out of ${total} ${total === 1 ? "timer" : "reps"}.`,
+    completeText: total + "/" + total,
+    completeLabel: "done",
+    completeAccessibleText: `Complete. ${total} out of ${total} ${total === 1 ? "timer" : "reps"}.`,
+  };
 }
 
 function wakeStatusText() {
