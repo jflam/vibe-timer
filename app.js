@@ -351,6 +351,7 @@ const state = {
   cueVolume: clampCueVolume(Number(savedSettings.cueVolume ?? 1)),
   wakeWanted: savedSettings.wakeWanted ?? true,
   audioContext: null,
+  audioPrimedAt: 0,
   wakeLock: null,
   rafId: null,
   supportStatus: "",
@@ -523,13 +524,12 @@ function startTimer() {
     state.lastPhaseIndex = 0;
   }
 
-  unlockAudio();
   requestWakeLock();
   state.running = true;
   state.startedAt = performance.now();
   const { index, phase } = getCurrentPhase();
   state.lastPhaseIndex = index;
-  playCue(phase?.kind === "rest" ? "rest" : "work");
+  void playCue(phase?.kind === "rest" ? "rest" : "work");
   vibrate(phase?.kind === "rest" ? 30 : 50);
   tick();
 }
@@ -596,7 +596,7 @@ function tick() {
 
   if (index !== state.lastPhaseIndex && phase) {
     state.lastPhaseIndex = index;
-    playCue(phase.kind === "rest" ? "rest" : "work");
+    void playCue(phase.kind === "rest" ? "rest" : "work");
     vibrate(phase.kind === "rest" ? [20] : [45, 30, 45]);
   }
 
@@ -606,7 +606,7 @@ function tick() {
     state.running = false;
     cancelAnimationFrame(state.rafId);
     releaseWakeLock();
-    playCue("finish");
+    void playCue("finish");
     vibrate([90, 45, 90]);
   }
 
@@ -786,29 +786,97 @@ function toggleFavorite(id = state.activePreset.id) {
   renderPresets();
 }
 
-function unlockAudio() {
-  if (!state.soundEnabled) {
-    return;
-  }
-  const AudioEngine = window.AudioContext || window.webkitAudioContext;
+function audioEngine() {
+  return window.AudioContext || window.webkitAudioContext;
+}
+
+function createAudioContext() {
+  const AudioEngine = audioEngine();
   if (!AudioEngine) {
     state.supportStatus = "Audio cues unsupported";
-    return;
+    render();
+    return null;
   }
-  if (!state.audioContext) {
-    state.audioContext = new AudioEngine();
+
+  const context = new AudioEngine();
+  context.addEventListener?.("statechange", () => {
+    if (state.audioContext === context && context.state === "interrupted") {
+      state.supportStatus = "Audio interrupted. Tap any control to re-arm sound.";
+      render();
+    }
+  });
+  state.audioContext = context;
+  return context;
+}
+
+function disposeAudioContext() {
+  const context = state.audioContext;
+  state.audioContext = null;
+  if (context && context.state !== "closed") {
+    const closePromise = context.close?.();
+    closePromise?.catch?.(() => {});
   }
-  if (state.audioContext.state === "suspended") {
-    state.audioContext.resume();
+}
+
+function unlockAudio({ recreate = true } = {}) {
+  if (!state.soundEnabled || state.cueVolume <= 0) {
+    return null;
   }
+
+  let context = state.audioContext;
+  if (!context || context.state === "closed" || context.state === "interrupted") {
+    disposeAudioContext();
+    context = createAudioContext();
+  }
+
+  if (!context) {
+    return null;
+  }
+
+  if (context.state !== "running") {
+    try {
+      const resumePromise = context.resume?.();
+      resumePromise
+        ?.then?.(() => {
+          state.audioPrimedAt = Date.now();
+          if (state.supportStatus.startsWith("Audio ") || state.supportStatus.startsWith("Tap ")) {
+            state.supportStatus = "";
+            render();
+          }
+        })
+        ?.catch?.(() => {
+          if (!recreate) {
+            return;
+          }
+          disposeAudioContext();
+          createAudioContext()?.resume?.().catch?.(() => {});
+        });
+    } catch {
+      if (recreate) {
+        disposeAudioContext();
+        context = createAudioContext();
+      }
+    }
+  } else {
+    state.audioPrimedAt = Date.now();
+    if (state.supportStatus.startsWith("Audio ") || state.supportStatus.startsWith("Tap ")) {
+      state.supportStatus = "";
+      render();
+    }
+  }
+
+  return context;
+}
+
+function primeAudioFromGesture() {
+  unlockAudio();
 }
 
 function playCue(type) {
   if (!state.soundEnabled || state.cueVolume <= 0) {
     return;
   }
-  unlockAudio();
-  const context = state.audioContext;
+  const context = unlockAudio();
   if (!context) {
     return;
   }
@@ -827,21 +895,27 @@ function playCue(type) {
   };
 
   const now = context.currentTime;
-  sequences[type].forEach((note) => {
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = note.type;
-    oscillator.frequency.value = note.frequency;
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    const start = now + note.offset;
-    const peakGain = Math.max(0.0001, Math.min(1.4, note.gain * state.cueVolume));
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(peakGain, start + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + note.duration);
-    oscillator.start(start);
-    oscillator.stop(start + note.duration + 0.02);
-  });
+  try {
+    sequences[type].forEach((note) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = note.type;
+      oscillator.frequency.value = note.frequency;
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      const start = now + note.offset;
+      const peakGain = Math.max(0.0001, Math.min(1.4, note.gain * state.cueVolume));
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(peakGain, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + note.duration);
+      oscillator.start(start);
+      oscillator.stop(start + note.duration + 0.02);
+    });
+  } catch {
+    disposeAudioContext();
+    state.supportStatus = "Audio reset. Tap Start to re-arm sound.";
+    render();
+  }
 }
 
 function vibrate(pattern) {
@@ -917,7 +991,7 @@ elements.volumeSlider.addEventListener("input", () => {
 
 elements.volumeSlider.addEventListener("change", () => {
   if (!state.running) {
-    playCue("work");
+    void playCue("work");
   }
 });
 
@@ -954,10 +1028,26 @@ elements.customForm.addEventListener("submit", (event) => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && state.running && state.wakeWanted) {
+  if (document.visibilityState === "hidden") {
+    disposeAudioContext();
+    return;
+  }
+
+  if (state.running) {
+    state.supportStatus = "Tap any control to re-arm sound.";
+    render();
+  }
+
+  if (state.running && state.wakeWanted) {
     requestWakeLock();
   }
 });
+
+if ("PointerEvent" in window) {
+  document.addEventListener("pointerdown", primeAudioFromGesture, { capture: true, passive: true });
+} else {
+  document.addEventListener("touchend", primeAudioFromGesture, { capture: true, passive: true });
+}
 
 if (savedFavoritesVersion < 2) {
   saveFavorites();
