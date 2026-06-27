@@ -2,7 +2,30 @@
 
 Installable single-page PWA for PT holds, mobility blocks, HIIT intervals, and quick custom work/rest timers.
 
-## First draft
+## Live app
+
+Open the published app here:
+
+[https://jflam.github.io/vibe-timer/](https://jflam.github.io/vibe-timer/)
+
+Source repo:
+
+[https://github.com/jflam/vibe-timer](https://github.com/jflam/vibe-timer)
+
+![Vibe Timer mobile screenshot](docs/screenshots/vibe-timer-home.jpg)
+
+## Install on iOS
+
+1. Open [https://jflam.github.io/vibe-timer/](https://jflam.github.io/vibe-timer/) in Safari on your iPhone.
+2. Tap the Safari Share button.
+3. Choose `Add to Home Screen`.
+4. Keep the name `Vibe Timer`, or rename it.
+5. Tap `Add`.
+6. Launch `Vibe Timer` from the Home Screen.
+
+After the first load, the app shell is cached for offline use. If an update does not appear right away in the Home Screen app, force close and reopen it; if it still stays stale, delete the Home Screen icon and add it again from Safari.
+
+## Features
 
 - Static app: `index.html`, `styles.css`, `app.js`.
 - PWA shell: `manifest.webmanifest`, `sw.js`, `assets/icon.svg`.
