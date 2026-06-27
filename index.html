@@ -15,9 +15,6 @@
   </head>
   <body>
     <svg aria-hidden="true" class="icon-defs">
-      <symbol id="icon-x" viewBox="0 0 24 24">
-        <path d="M6 6l12 12M18 6L6 18" />
-      </symbol>
       <symbol id="icon-star" viewBox="0 0 24 24">
         <path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6z" />
       </symbol>
@@ -51,10 +48,6 @@
         <path d="M16 9.5a4 4 0 0 1 0 5" />
         <path d="M18 7a7 7 0 0 1 0 10" />
       </symbol>
-      <symbol id="icon-phone" viewBox="0 0 24 24">
-        <path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
-        <path d="M11 18h2" />
-      </symbol>
       <symbol id="icon-search" viewBox="0 0 24 24">
         <path d="M10.5 18a7.5 7.5 0 1 1 5.3-12.8A7.5 7.5 0 0 1 10.5 18z" />
         <path d="M16 16l4.5 4.5" />
@@ -64,9 +57,7 @@
     <main class="app-shell">
       <section class="timer-panel" aria-label="Active timer">
         <header class="timer-topbar">
-          <button class="icon-button ghost" type="button" id="resetButton" aria-label="Reset timer">
-            <svg><use href="#icon-x"></use></svg>
-          </button>
+          <span class="topbar-spacer" aria-hidden="true"></span>
           <div class="top-title">
             <span id="appTitle">Vibe Timer</span>
             <strong id="presetName">10 reps 10 / 5</strong>
@@ -126,15 +117,6 @@
             <button class="icon-button ring" type="button" id="wakeButton" aria-label="Toggle screen wake lock" title="Keep screen awake">
               <svg><use href="#icon-lock"></use></svg>
             </button>
-            <button
-              class="icon-button ring"
-              type="button"
-              id="mediaButton"
-              aria-label="Toggle experimental lock-screen controls"
-              title="Experimental lock-screen controls"
-            >
-              <svg><use href="#icon-phone"></use></svg>
-            </button>
             <button class="icon-button ring" type="button" id="restartButton" aria-label="Restart timer" title="Restart">
               <svg><use href="#icon-reset"></use></svg>
             </button>
@@ -183,7 +165,6 @@
       </section>
     </main>
 
-    <audio id="mediaBridge" preload="auto" loop></audio>
     <script src="app.js" defer></script>
   </body>
 </html>

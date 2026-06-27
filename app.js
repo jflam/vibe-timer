@@ -297,13 +297,11 @@ const elements = {
   startPauseButton: document.querySelector("#startPauseButton"),
   startPauseIcon: document.querySelector("#startPauseIcon use"),
   startPauseLabel: document.querySelector("#startPauseLabel"),
-  resetButton: document.querySelector("#resetButton"),
   restartButton: document.querySelector("#restartButton"),
   previousPhaseButton: document.querySelector("#previousPhaseButton"),
   nextPhaseButton: document.querySelector("#nextPhaseButton"),
   soundButton: document.querySelector("#soundButton"),
   wakeButton: document.querySelector("#wakeButton"),
-  mediaButton: document.querySelector("#mediaButton"),
   supportLine: document.querySelector("#supportLine"),
   favoritesOnlyButton: document.querySelector("#favoritesOnlyButton"),
   presetSearch: document.querySelector("#presetSearch"),
@@ -313,7 +311,6 @@ const elements = {
   customWork: document.querySelector("#customWork"),
   customRest: document.querySelector("#customRest"),
   customRounds: document.querySelector("#customRounds"),
-  mediaBridge: document.querySelector("#mediaBridge"),
 };
 
 const storage = {
@@ -349,7 +346,6 @@ const state = {
   favorites: initialFavorites,
   soundEnabled: savedSettings.soundEnabled ?? true,
   wakeWanted: savedSettings.wakeWanted ?? true,
-  mediaWanted: savedSettings.mediaWanted ?? true,
   audioContext: null,
   wakeLock: null,
   rafId: null,
@@ -398,7 +394,6 @@ function saveSettings() {
     JSON.stringify({
       soundEnabled: state.soundEnabled,
       wakeWanted: state.wakeWanted,
-      mediaWanted: state.mediaWanted,
     }),
   );
 }
@@ -447,7 +442,6 @@ function loadPreset(preset, options = {}) {
   writeStoredValue(storage.lastPreset, preset.id);
   render();
   renderPresets();
-  updateMediaSession();
 
   if (options.keepRunning || wasRunning) {
     startTimer();
@@ -518,7 +512,6 @@ function startTimer() {
   }
 
   unlockAudio();
-  startMediaBridge();
   requestWakeLock();
   state.running = true;
   state.startedAt = performance.now();
@@ -526,7 +519,6 @@ function startTimer() {
   state.lastPhaseIndex = index;
   playCue(phase?.kind === "rest" ? "rest" : "work");
   vibrate(phase?.kind === "rest" ? 30 : 50);
-  updateMediaSession();
   tick();
 }
 
@@ -538,11 +530,9 @@ function pauseTimer(options = {}) {
   state.running = false;
   cancelAnimationFrame(state.rafId);
   releaseWakeLock();
-  pauseMediaBridge();
   if (!options.silent) {
     vibrate(20);
   }
-  updateMediaSession();
   render();
 }
 
@@ -551,7 +541,6 @@ function resetTimer() {
   state.elapsedWhenPaused = 0;
   state.complete = false;
   state.lastPhaseIndex = 0;
-  updateMediaSession();
   render();
 }
 
@@ -562,7 +551,6 @@ function seekTo(seconds) {
   state.complete = state.elapsedWhenPaused >= state.totalSeconds;
   state.lastPhaseIndex = getPhaseIndex(state.elapsedWhenPaused);
   render();
-  updateMediaSession();
   if (wasRunning && !state.complete) {
     startTimer();
   }
@@ -606,10 +594,8 @@ function tick() {
     state.running = false;
     cancelAnimationFrame(state.rafId);
     releaseWakeLock();
-    pauseMediaBridge();
     playCue("finish");
     vibrate([90, 45, 90]);
-    updateMediaSession();
   }
 
   render();
@@ -663,12 +649,10 @@ function render() {
 
   elements.soundButton.classList.toggle("active", state.soundEnabled);
   elements.wakeButton.classList.toggle("active", state.wakeWanted);
-  elements.mediaButton.classList.toggle("active", state.mediaWanted);
 
   const supportParts = [];
   supportParts.push(state.soundEnabled ? "Sound on" : "Muted");
   supportParts.push(state.wakeWanted ? wakeStatusText() : "Wake off");
-  supportParts.push(state.mediaWanted ? mediaStatusText() : "Lock-screen controls off");
   elements.supportLine.textContent = state.supportStatus || supportParts.join(" · ");
 }
 
@@ -690,16 +674,6 @@ function wakeStatusText() {
     return "Wake unsupported";
   }
   return state.wakeLock ? "Screen awake" : "Wake ready";
-}
-
-function mediaStatusText() {
-  if (!("mediaSession" in navigator)) {
-    return "Lock-screen controls unsupported";
-  }
-  if (!state.mediaWanted) {
-    return "Lock-screen controls off";
-  }
-  return state.running ? "Lock-screen controls requested" : "Lock-screen controls ready";
 }
 
 function renderCategories() {
@@ -875,10 +849,7 @@ async function requestWakeLock() {
     });
     state.supportStatus = "";
   } catch (error) {
-    state.supportStatus =
-      state.mediaWanted && state.running
-        ? "Lock-screen controls requested; Safari may ignore them."
-        : `Wake lock unavailable: ${error.name}`;
+    state.supportStatus = `Wake lock unavailable: ${error.name}`;
   }
   render();
 }
@@ -891,125 +862,6 @@ async function releaseWakeLock() {
     await state.wakeLock.release();
   } catch {
     state.wakeLock = null;
-  }
-}
-
-function createMediaBridgeSource() {
-  const sampleRate = 8000;
-  const seconds = 8;
-  const samples = sampleRate * seconds;
-  const headerSize = 44;
-  const bytesPerSample = 2;
-  const buffer = new ArrayBuffer(headerSize + samples * bytesPerSample);
-  const view = new DataView(buffer);
-
-  writeString(view, 0, "RIFF");
-  view.setUint32(4, 36 + samples * bytesPerSample, true);
-  writeString(view, 8, "WAVE");
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * bytesPerSample, true);
-  view.setUint16(32, bytesPerSample, true);
-  view.setUint16(34, 16, true);
-  writeString(view, 36, "data");
-  view.setUint32(40, samples * bytesPerSample, true);
-
-  for (let index = 0; index < samples; index += 1) {
-    view.setInt16(headerSize + index * bytesPerSample, 0, true);
-  }
-
-  const blob = new Blob([buffer], { type: "audio/wav" });
-  elements.mediaBridge.src = URL.createObjectURL(blob);
-  elements.mediaBridge.volume = 0.001;
-}
-
-function writeString(view, offset, value) {
-  for (let index = 0; index < value.length; index += 1) {
-    view.setUint8(offset + index, value.charCodeAt(index));
-  }
-}
-
-async function startMediaBridge() {
-  if (!state.mediaWanted || !("mediaSession" in navigator)) {
-    updateMediaSession();
-    return;
-  }
-
-  if (!elements.mediaBridge.src) {
-    createMediaBridgeSource();
-  }
-
-  try {
-    await elements.mediaBridge.play();
-    state.supportStatus = "Lock-screen controls requested; Safari may ignore them.";
-  } catch (error) {
-    state.supportStatus = `Lock-screen controls blocked: ${error.name}`;
-  }
-
-  updateMediaSession();
-}
-
-function pauseMediaBridge() {
-  elements.mediaBridge.pause();
-  updateMediaSession();
-}
-
-function updateMediaSession() {
-  if (!("mediaSession" in navigator)) {
-    return;
-  }
-
-  const elapsed = getElapsed();
-  const { phase } = getCurrentPhase(elapsed);
-  if ("MediaMetadata" in window) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: state.activePreset.name,
-      artist: phase ? `${phase.label} · ${phase.round}/${phase.roundCount}` : "Vibe Timer",
-      album: "Vibe Timer",
-      artwork: [
-        {
-          src: `${location.origin}${location.pathname.replace(/\/[^/]*$/, "/")}assets/icon.svg`,
-          sizes: "any",
-          type: "image/svg+xml",
-        },
-      ],
-    });
-  }
-  try {
-    navigator.mediaSession.playbackState = state.running ? "playing" : "paused";
-  } catch {
-    // Some Safari builds expose Media Session partially.
-  }
-
-  setMediaAction("play", startTimer);
-  setMediaAction("pause", () => pauseTimer());
-  setMediaAction("stop", resetTimer);
-  setMediaAction("nexttrack", nextPhase);
-  setMediaAction("previoustrack", previousPhase);
-  setMediaAction("seekforward", () => seekTo(getElapsed() + 10));
-  setMediaAction("seekbackward", () => seekTo(getElapsed() - 10));
-
-  if ("setPositionState" in navigator.mediaSession && state.totalSeconds > 0) {
-    try {
-      navigator.mediaSession.setPositionState({
-        duration: state.totalSeconds,
-        playbackRate: 1,
-        position: Math.min(state.totalSeconds, elapsed),
-      });
-    } catch {
-      // Some browsers reject position state while metadata is settling.
-    }
-  }
-}
-
-function setMediaAction(action, handler) {
-  try {
-    navigator.mediaSession.setActionHandler(action, handler);
-  } catch {
-    // Unsupported actions are expected on some mobile browsers.
   }
 }
 
@@ -1028,7 +880,6 @@ elements.startPauseButton.addEventListener("click", () => {
   }
 });
 
-elements.resetButton.addEventListener("click", resetTimer);
 elements.restartButton.addEventListener("click", resetTimer);
 elements.previousPhaseButton.addEventListener("click", previousPhase);
 elements.nextPhaseButton.addEventListener("click", nextPhase);
@@ -1046,21 +897,6 @@ elements.wakeButton.addEventListener("click", () => {
     requestWakeLock();
   } else {
     releaseWakeLock();
-  }
-  saveSettings();
-  render();
-});
-
-elements.mediaButton.addEventListener("click", () => {
-  state.mediaWanted = !state.mediaWanted;
-  if (state.mediaWanted && state.running) {
-    startMediaBridge();
-    state.supportStatus = "Lock-screen controls requested; Safari may ignore them.";
-  } else if (state.mediaWanted) {
-    state.supportStatus = "Start the timer, then lock phone to try controls.";
-  } else {
-    pauseMediaBridge();
-    state.supportStatus = "Lock-screen controls off.";
   }
   saveSettings();
   render();
