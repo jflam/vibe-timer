@@ -302,6 +302,8 @@ const elements = {
   nextPhaseButton: document.querySelector("#nextPhaseButton"),
   soundButton: document.querySelector("#soundButton"),
   wakeButton: document.querySelector("#wakeButton"),
+  volumeSlider: document.querySelector("#volumeSlider"),
+  volumeValue: document.querySelector("#volumeValue"),
   supportLine: document.querySelector("#supportLine"),
   favoritesOnlyButton: document.querySelector("#favoritesOnlyButton"),
   presetSearch: document.querySelector("#presetSearch"),
@@ -345,6 +347,7 @@ const state = {
   query: "",
   favorites: initialFavorites,
   soundEnabled: savedSettings.soundEnabled ?? true,
+  cueVolume: clampUnit(Number(savedSettings.cueVolume ?? 0.85)),
   wakeWanted: savedSettings.wakeWanted ?? true,
   audioContext: null,
   wakeLock: null,
@@ -393,9 +396,17 @@ function saveSettings() {
     storage.settings,
     JSON.stringify({
       soundEnabled: state.soundEnabled,
+      cueVolume: state.cueVolume,
       wakeWanted: state.wakeWanted,
     }),
   );
+}
+
+function clampUnit(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 function buildPhases(preset) {
@@ -649,9 +660,11 @@ function render() {
 
   elements.soundButton.classList.toggle("active", state.soundEnabled);
   elements.wakeButton.classList.toggle("active", state.wakeWanted);
+  elements.volumeSlider.value = Math.round(state.cueVolume * 100);
+  elements.volumeValue.textContent = `${Math.round(state.cueVolume * 100)}%`;
 
   const supportParts = [];
-  supportParts.push(state.soundEnabled ? "Sound on" : "Muted");
+  supportParts.push(state.soundEnabled ? `Sound ${Math.round(state.cueVolume * 100)}%` : "Muted");
   supportParts.push(state.wakeWanted ? wakeStatusText() : "Wake off");
   elements.supportLine.textContent = state.supportStatus || supportParts.join(" · ");
 }
@@ -790,7 +803,7 @@ function unlockAudio() {
 }
 
 function playCue(type) {
-  if (!state.soundEnabled) {
+  if (!state.soundEnabled || state.cueVolume <= 0) {
     return;
   }
   unlockAudio();
@@ -801,14 +814,14 @@ function playCue(type) {
 
   const sequences = {
     work: [
-      { frequency: 660, offset: 0, duration: 0.09 },
-      { frequency: 880, offset: 0.1, duration: 0.11 },
+      { frequency: 660, offset: 0, duration: 0.1, gain: 0.24 },
+      { frequency: 880, offset: 0.11, duration: 0.13, gain: 0.26 },
     ],
-    rest: [{ frequency: 392, offset: 0, duration: 0.13 }],
+    rest: [{ frequency: 392, offset: 0, duration: 0.15, gain: 0.22 }],
     finish: [
-      { frequency: 523.25, offset: 0, duration: 0.1 },
-      { frequency: 659.25, offset: 0.11, duration: 0.1 },
-      { frequency: 783.99, offset: 0.22, duration: 0.14 },
+      { frequency: 523.25, offset: 0, duration: 0.11, gain: 0.28 },
+      { frequency: 659.25, offset: 0.12, duration: 0.11, gain: 0.3 },
+      { frequency: 783.99, offset: 0.24, duration: 0.16, gain: 0.32 },
     ],
   };
 
@@ -821,8 +834,9 @@ function playCue(type) {
     oscillator.connect(gain);
     gain.connect(context.destination);
     const start = now + note.offset;
+    const peakGain = Math.max(0.0001, note.gain * state.cueVolume);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(type === "finish" ? 0.12 : 0.09, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(peakGain, start + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + note.duration);
     oscillator.start(start);
     oscillator.stop(start + note.duration + 0.02);
@@ -889,6 +903,21 @@ elements.soundButton.addEventListener("click", () => {
   state.soundEnabled = !state.soundEnabled;
   saveSettings();
   render();
+});
+
+elements.volumeSlider.addEventListener("input", () => {
+  state.cueVolume = clampUnit(Number(elements.volumeSlider.value) / 100);
+  if (state.cueVolume > 0) {
+    state.soundEnabled = true;
+  }
+  saveSettings();
+  render();
+});
+
+elements.volumeSlider.addEventListener("change", () => {
+  if (!state.running) {
+    playCue("work");
+  }
 });
 
 elements.wakeButton.addEventListener("click", () => {
