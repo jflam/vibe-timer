@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#d84f66" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Vibe Timer" />
+    <title>Vibe Timer</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="assets/icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <svg aria-hidden="true" class="icon-defs">
+      <symbol id="icon-x" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24">
+        <path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6z" />
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <path d="M12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4z" />
+        <path d="M18.5 13.4c.1-.5.1-.9.1-1.4s0-.9-.1-1.4l2-1.5-2-3.5-2.4 1a8.2 8.2 0 0 0-2.3-1.4L13.5 2h-4l-.4 3.2c-.8.3-1.6.8-2.3 1.4l-2.4-1-2 3.5 2 1.5c-.1.5-.1.9-.1 1.4s0 .9.1 1.4l-2 1.5 2 3.5 2.4-1c.7.6 1.5 1.1 2.3 1.4l.4 3.2h4l.4-3.2c.8-.3 1.6-.8 2.3-1.4l2.4 1 2-3.5-2.1-1.5z" />
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="M8 5.5v13l10-6.5L8 5.5z" />
+      </symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24">
+        <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+      </symbol>
+      <symbol id="icon-skip" viewBox="0 0 24 24">
+        <path d="M5 5v14l8-7-8-7zM14 5v14l8-7-8-7z" />
+      </symbol>
+      <symbol id="icon-prev" viewBox="0 0 24 24">
+        <path d="M19 5v14l-8-7 8-7zM10 5v14l-8-7 8-7z" />
+      </symbol>
+      <symbol id="icon-reset" viewBox="0 0 24 24">
+        <path d="M5.5 12a6.5 6.5 0 1 0 2.2-4.9" />
+        <path d="M5.5 4.5V9h4.4" />
+      </symbol>
+      <symbol id="icon-lock" viewBox="0 0 24 24">
+        <path d="M7 10V8a5 5 0 0 1 10 0v2" />
+        <path d="M6 10h12v10H6z" />
+        <path d="M12 14v2.5" />
+      </symbol>
+      <symbol id="icon-volume" viewBox="0 0 24 24">
+        <path d="M4 9v6h4l5 4V5L8 9H4z" />
+        <path d="M16 9.5a4 4 0 0 1 0 5" />
+        <path d="M18 7a7 7 0 0 1 0 10" />
+      </symbol>
+      <symbol id="icon-phone" viewBox="0 0 24 24">
+        <path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+        <path d="M11 18h2" />
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <path d="M10.5 18a7.5 7.5 0 1 1 5.3-12.8A7.5 7.5 0 0 1 10.5 18z" />
+        <path d="M16 16l4.5 4.5" />
+      </symbol>
+    </svg>
+
+    <main class="app-shell">
+      <section class="timer-panel" aria-label="Active timer">
+        <div class="ios-status" aria-hidden="true">
+          <span id="clock">9:41</span>
+          <span class="status-glyphs">▮▮▮ ))) 80</span>
+        </div>
+
+        <header class="timer-topbar">
+          <button class="icon-button ghost" type="button" id="resetButton" aria-label="Reset timer">
+            <svg><use href="#icon-x"></use></svg>
+          </button>
+          <div class="top-title">
+            <span id="appTitle">Vibe Timer</span>
+            <strong id="presetName">PT 5 on / 5 off</strong>
+          </div>
+          <button class="icon-button ghost" type="button" id="favoriteButton" aria-label="Toggle favorite">
+            <svg><use href="#icon-star"></use></svg>
+          </button>
+        </header>
+
+        <div class="timer-hero">
+          <div class="timer-number" id="timeRemaining">00:05</div>
+          <div class="phase-row">
+            <button class="icon-button ghost" type="button" id="previousPhaseButton" aria-label="Previous interval">
+              <svg><use href="#icon-prev"></use></svg>
+            </button>
+            <div>
+              <h1 id="phaseName">Work</h1>
+              <p id="roundInfo">1/10 rep</p>
+            </div>
+            <button class="icon-button ghost" type="button" id="nextPhaseButton" aria-label="Next interval">
+              <svg><use href="#icon-skip"></use></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="metric-row">
+          <div>
+            <strong id="elapsedTime">00:00</strong>
+            <span>Elapsed</span>
+          </div>
+          <div>
+            <strong id="totalTime">01:35</strong>
+            <span>Total</span>
+          </div>
+          <div>
+            <strong id="remainingTime">01:35</strong>
+            <span>Left</span>
+          </div>
+        </div>
+
+        <section class="control-deck" aria-label="Timer controls">
+          <div class="ring-wrap">
+            <svg class="progress-ring" viewBox="0 0 120 120">
+              <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+              <circle class="ring-progress" id="progressCircle" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <button class="primary-control" type="button" id="startPauseButton" aria-label="Start timer">
+              <svg id="startPauseIcon"><use href="#icon-play"></use></svg>
+              <span id="startPauseLabel">START</span>
+            </button>
+          </div>
+
+          <div class="quick-controls">
+            <button class="icon-button ring" type="button" id="soundButton" aria-label="Toggle sound">
+              <svg><use href="#icon-volume"></use></svg>
+            </button>
+            <button class="icon-button ring" type="button" id="wakeButton" aria-label="Toggle screen wake lock">
+              <svg><use href="#icon-lock"></use></svg>
+            </button>
+            <button class="icon-button ring" type="button" id="mediaButton" aria-label="Toggle phone media controls">
+              <svg><use href="#icon-phone"></use></svg>
+            </button>
+            <button class="icon-button ring" type="button" id="restartButton" aria-label="Restart timer">
+              <svg><use href="#icon-reset"></use></svg>
+            </button>
+          </div>
+
+          <p class="support-line" id="supportLine">Ready</p>
+        </section>
+      </section>
+
+      <section class="preset-panel" aria-label="Timer presets">
+        <div class="preset-header">
+          <div>
+            <span class="eyebrow">Presets</span>
+            <h2>Favorites and common sets</h2>
+          </div>
+          <button class="mode-chip active" type="button" id="favoritesOnlyButton">Favorites</button>
+        </div>
+
+        <label class="search-box">
+          <svg><use href="#icon-search"></use></svg>
+          <input id="presetSearch" type="search" placeholder="Search PT, Tabata, plank..." autocomplete="off" />
+        </label>
+
+        <div class="category-tabs" id="categoryTabs" role="tablist" aria-label="Preset categories"></div>
+        <div class="preset-list" id="presetList"></div>
+
+        <form class="custom-builder" id="customForm">
+          <div class="builder-title">
+            <span class="eyebrow">Quick custom</span>
+            <strong>Work / rest repeat</strong>
+          </div>
+          <label>
+            <span>Work</span>
+            <input id="customWork" type="number" min="1" max="600" value="30" inputmode="numeric" />
+          </label>
+          <label>
+            <span>Rest</span>
+            <input id="customRest" type="number" min="0" max="600" value="15" inputmode="numeric" />
+          </label>
+          <label>
+            <span>Reps</span>
+            <input id="customRounds" type="number" min="1" max="99" value="10" inputmode="numeric" />
+          </label>
+          <button type="submit">Load</button>
+        </form>
+      </section>
+    </main>
+
+    <audio id="mediaBridge" preload="auto" loop></audio>
+    <script src="app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>Vibe Timer</title>
+  <defs>
+    <linearGradient id="bg" x1="68" y1="64" x2="444" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d94f66" />
+      <stop offset="0.58" stop-color="#c34759" />
+      <stop offset="1" stop-color="#0f776e" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <circle cx="256" cy="270" r="142" fill="none" stroke="#ffffff" stroke-opacity="0.34" stroke-width="28" />
+  <path d="M256 128a142 142 0 0 1 123 213" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="28" />
+  <path d="M220 202v136l108-68-108-68z" fill="#ffffff" />
+  <path d="M194 86h124" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="26" />
+</svg>
