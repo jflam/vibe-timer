@@ -10,7 +10,7 @@ Installable single-page PWA for PT holds, mobility blocks, HIIT intervals, and q
 - Favorites: saved in `localStorage`.
 - Cues: Web Audio start/rest/finish sounds plus vibration where supported.
 - Screen-on mode: uses the Screen Wake Lock API when available.
-- Phone controls: uses the Media Session API with play, pause, skip, previous, stop, and seek handlers where available.
+- Experimental lock-screen controls: uses the Media Session API with play, pause, skip, previous, stop, and seek handlers where the browser/OS chooses to expose them.
 
 ## Run locally
 
@@ -22,7 +22,7 @@ Then open `http://localhost:5173`.
 
 ## PWA control notes
 
-PWAs can expose phone-level media controls through the Media Session API, but this is not the same as a guaranteed background timer. The page needs an active media session, support varies by browser and OS, and mobile browsers can still suspend or throttle work when the screen is locked. This draft therefore treats Media Session controls as useful but experimental, and treats Screen Wake Lock as the more reliable PWA mode.
+PWAs can expose phone-level media controls through the Media Session API, but this is not the same as a guaranteed background timer. The page can request an active media session while the timer runs, but Safari/iOS decides whether to show controls and mobile browsers can still suspend or throttle work when the screen is locked. This draft therefore labels Media Session controls as experimental, and treats Screen Wake Lock as the more reliable PWA mode.
 
 Useful references:
 

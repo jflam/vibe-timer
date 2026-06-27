@@ -63,18 +63,13 @@
 
     <main class="app-shell">
       <section class="timer-panel" aria-label="Active timer">
-        <div class="ios-status" aria-hidden="true">
-          <span id="clock">9:41</span>
-          <span class="status-glyphs">▮▮▮ ))) 80</span>
-        </div>
-
         <header class="timer-topbar">
           <button class="icon-button ghost" type="button" id="resetButton" aria-label="Reset timer">
             <svg><use href="#icon-x"></use></svg>
           </button>
           <div class="top-title">
             <span id="appTitle">Vibe Timer</span>
-            <strong id="presetName">PT 5 on / 5 off</strong>
+            <strong id="presetName">10 reps 10 / 5</strong>
           </div>
           <button class="icon-button ghost" type="button" id="favoriteButton" aria-label="Toggle favorite">
             <svg><use href="#icon-star"></use></svg>
@@ -125,16 +120,22 @@
           </div>
 
           <div class="quick-controls">
-            <button class="icon-button ring" type="button" id="soundButton" aria-label="Toggle sound">
+            <button class="icon-button ring" type="button" id="soundButton" aria-label="Toggle sound" title="Sound">
               <svg><use href="#icon-volume"></use></svg>
             </button>
-            <button class="icon-button ring" type="button" id="wakeButton" aria-label="Toggle screen wake lock">
+            <button class="icon-button ring" type="button" id="wakeButton" aria-label="Toggle screen wake lock" title="Keep screen awake">
               <svg><use href="#icon-lock"></use></svg>
             </button>
-            <button class="icon-button ring" type="button" id="mediaButton" aria-label="Toggle phone media controls">
+            <button
+              class="icon-button ring"
+              type="button"
+              id="mediaButton"
+              aria-label="Toggle experimental lock-screen controls"
+              title="Experimental lock-screen controls"
+            >
               <svg><use href="#icon-phone"></use></svg>
             </button>
-            <button class="icon-button ring" type="button" id="restartButton" aria-label="Restart timer">
+            <button class="icon-button ring" type="button" id="restartButton" aria-label="Restart timer" title="Restart">
               <svg><use href="#icon-reset"></use></svg>
             </button>
           </div>

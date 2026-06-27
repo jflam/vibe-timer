@@ -2,18 +2,44 @@ const ringCircumference = 2 * Math.PI * 52;
 
 const presets = [
   {
-    id: "pt-5-5-10",
-    name: "PT 5 on / 5 off",
+    id: "pt-10-5-10",
+    name: "10 reps 10 / 5",
     category: "PT",
-    summary: "Short activation holds with equal release.",
+    summary: "Ten 10-second holds with short 5-second rests.",
     rounds: 10,
     intervals: [
-      { label: "Contract", seconds: 5, kind: "work" },
-      { label: "Release", seconds: 5, kind: "rest" },
+      { label: "Hold", seconds: 10, kind: "work" },
+      { label: "Rest", seconds: 5, kind: "rest" },
     ],
     dropFinalRest: true,
     color: "#d94f66",
-    tags: ["5s", "10 reps", "activation"],
+    tags: ["10s hold", "5s rest", "10 reps"],
+    favorite: true,
+  },
+  {
+    id: "timer-30",
+    name: "30s timer",
+    category: "Quick",
+    summary: "Single 30-second timer with one finish cue.",
+    rounds: 1,
+    intervals: [{ label: "Timer", seconds: 30, kind: "work" }],
+    color: "#0f776e",
+    tags: ["30s", "single"],
+    favorite: true,
+  },
+  {
+    id: "pt-5-5-10",
+    name: "10 reps 5 / 5",
+    category: "PT",
+    summary: "Ten 5-second holds with equal 5-second rests.",
+    rounds: 10,
+    intervals: [
+      { label: "Hold", seconds: 5, kind: "work" },
+      { label: "Rest", seconds: 5, kind: "rest" },
+    ],
+    dropFinalRest: true,
+    color: "#d94f66",
+    tags: ["5s hold", "5s rest", "10 reps"],
     favorite: true,
   },
   {
@@ -259,7 +285,6 @@ const presets = [
 ];
 
 const elements = {
-  clock: document.querySelector("#clock"),
   presetName: document.querySelector("#presetName"),
   favoriteButton: document.querySelector("#favoriteButton"),
   timeRemaining: document.querySelector("#timeRemaining"),
@@ -293,6 +318,7 @@ const elements = {
 
 const storage = {
   favorites: "vibe-timer:favorites",
+  favoritesVersion: "vibe-timer:favorites-version",
   settings: "vibe-timer:settings",
   lastPreset: "vibe-timer:last-preset",
 };
@@ -302,6 +328,11 @@ const defaultFavorites = new Set(presets.filter((preset) => preset.favorite).map
 const savedFavorites = safeJson(readStoredValue(storage.favorites), [...defaultFavorites]);
 const savedSettings = safeJson(readStoredValue(storage.settings), {});
 const savedPresetId = readStoredValue(storage.lastPreset);
+const savedFavoritesVersion = Number(readStoredValue(storage.favoritesVersion) ?? 0);
+const initialFavorites = new Set(savedFavorites);
+if (savedFavoritesVersion < 2) {
+  ["pt-10-5-10", "timer-30", "pt-5-5-10"].forEach((id) => initialFavorites.add(id));
+}
 
 const state = {
   activePreset: presets.find((preset) => preset.id === savedPresetId) ?? presets[0],
@@ -315,7 +346,7 @@ const state = {
   selectedCategory: "All",
   showFavoritesOnly: false,
   query: "",
-  favorites: new Set(savedFavorites),
+  favorites: initialFavorites,
   soundEnabled: savedSettings.soundEnabled ?? true,
   wakeWanted: savedSettings.wakeWanted ?? true,
   mediaWanted: savedSettings.mediaWanted ?? true,
@@ -612,7 +643,7 @@ function render() {
   elements.phaseName.textContent = state.complete ? "Complete" : phase?.label ?? "Ready";
   elements.roundInfo.textContent = state.complete
     ? `${state.phases.length}/${state.phases.length} intervals`
-    : `${phase?.round ?? 1}/${phase?.roundCount ?? 1} rep`;
+    : phaseProgressText(phase, index);
   elements.timeRemaining.textContent = state.complete ? "00:00" : formatTime(phaseRemaining);
   elements.timeRemaining.classList.toggle("long", elements.timeRemaining.textContent.length > 5);
   elements.elapsedTime.textContent = formatTime(elapsed);
@@ -637,8 +668,21 @@ function render() {
   const supportParts = [];
   supportParts.push(state.soundEnabled ? "Sound on" : "Muted");
   supportParts.push(state.wakeWanted ? wakeStatusText() : "Wake off");
-  supportParts.push(state.mediaWanted ? mediaStatusText() : "Phone controls off");
+  supportParts.push(state.mediaWanted ? mediaStatusText() : "Lock-screen controls off");
   elements.supportLine.textContent = state.supportStatus || supportParts.join(" · ");
+}
+
+function phaseProgressText(phase, index) {
+  if (!phase) {
+    return "Ready";
+  }
+  if (phase.roundCount === 1 && state.phases.length === 1) {
+    return "single timer";
+  }
+  if (phase.roundCount === 1) {
+    return `${index + 1}/${state.phases.length} interval`;
+  }
+  return `${phase.round}/${phase.roundCount} rep`;
 }
 
 function wakeStatusText() {
@@ -650,16 +694,12 @@ function wakeStatusText() {
 
 function mediaStatusText() {
   if (!("mediaSession" in navigator)) {
-    return "Phone controls unsupported";
+    return "Lock-screen controls unsupported";
   }
-  return state.running ? "Phone controls active" : "Phone controls ready";
-}
-
-function renderClock() {
-  elements.clock.textContent = new Intl.DateTimeFormat([], {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date());
+  if (!state.mediaWanted) {
+    return "Lock-screen controls off";
+  }
+  return state.running ? "Lock-screen controls requested" : "Lock-screen controls ready";
 }
 
 function renderCategories() {
@@ -835,7 +875,10 @@ async function requestWakeLock() {
     });
     state.supportStatus = "";
   } catch (error) {
-    state.supportStatus = `Wake lock unavailable: ${error.name}`;
+    state.supportStatus =
+      state.mediaWanted && state.running
+        ? "Lock-screen controls requested; Safari may ignore them."
+        : `Wake lock unavailable: ${error.name}`;
   }
   render();
 }
@@ -901,8 +944,9 @@ async function startMediaBridge() {
 
   try {
     await elements.mediaBridge.play();
+    state.supportStatus = "Lock-screen controls requested; Safari may ignore them.";
   } catch (error) {
-    state.supportStatus = `Phone controls blocked: ${error.name}`;
+    state.supportStatus = `Lock-screen controls blocked: ${error.name}`;
   }
 
   updateMediaSession();
@@ -1011,8 +1055,12 @@ elements.mediaButton.addEventListener("click", () => {
   state.mediaWanted = !state.mediaWanted;
   if (state.mediaWanted && state.running) {
     startMediaBridge();
+    state.supportStatus = "Lock-screen controls requested; Safari may ignore them.";
+  } else if (state.mediaWanted) {
+    state.supportStatus = "Start the timer, then lock phone to try controls.";
   } else {
     pauseMediaBridge();
+    state.supportStatus = "Lock-screen controls off.";
   }
   saveSettings();
   render();
@@ -1045,8 +1093,11 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-setInterval(renderClock, 15_000);
-renderClock();
+if (savedFavoritesVersion < 2) {
+  saveFavorites();
+  writeStoredValue(storage.favoritesVersion, "2");
+}
+
 renderCategories();
 loadPreset(state.activePreset);
 installServiceWorker();

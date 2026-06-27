@@ -71,28 +71,12 @@ button {
   color: var(--white);
 }
 
-.ios-status {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 2.8rem;
-  padding: 0.9rem 1.3rem 0;
-  font-size: 0.9rem;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
-.status-glyphs {
-  font-size: 0.75rem;
-  opacity: 0.94;
-}
-
 .timer-topbar {
   display: grid;
   grid-template-columns: 3rem 1fr 3rem;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6rem 1.1rem 0;
+  padding: calc(0.95rem + env(safe-area-inset-top)) 1.1rem 0;
 }
 
 .top-title {
@@ -625,7 +609,7 @@ button {
   }
 
   .timer-hero {
-    padding-top: 2.2rem;
+    padding-top: 1.8rem;
   }
 
   .phase-row {

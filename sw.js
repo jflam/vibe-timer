@@ -1,4 +1,4 @@
-const CACHE_NAME = "vibe-timer-v2";
+const CACHE_NAME = "vibe-timer-v3";
 const APP_SHELL = [
   ".",
   "index.html",
