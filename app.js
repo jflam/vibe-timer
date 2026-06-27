@@ -1,4 +1,5 @@
 const ringCircumference = 2 * Math.PI * 52;
+const maxCueVolume = 2;
 
 const presets = [
   {
@@ -347,7 +348,7 @@ const state = {
   query: "",
   favorites: initialFavorites,
   soundEnabled: savedSettings.soundEnabled ?? true,
-  cueVolume: clampUnit(Number(savedSettings.cueVolume ?? 0.85)),
+  cueVolume: clampCueVolume(Number(savedSettings.cueVolume ?? 1)),
   wakeWanted: savedSettings.wakeWanted ?? true,
   audioContext: null,
   wakeLock: null,
@@ -402,11 +403,11 @@ function saveSettings() {
   );
 }
 
-function clampUnit(value) {
+function clampCueVolume(value) {
   if (!Number.isFinite(value)) {
     return 0;
   }
-  return Math.min(1, Math.max(0, value));
+  return Math.min(maxCueVolume, Math.max(0, value));
 }
 
 function buildPhases(preset) {
@@ -814,14 +815,14 @@ function playCue(type) {
 
   const sequences = {
     work: [
-      { frequency: 660, offset: 0, duration: 0.1, gain: 0.24 },
-      { frequency: 880, offset: 0.11, duration: 0.13, gain: 0.26 },
+      { frequency: 880, offset: 0, duration: 0.12, gain: 0.58, type: "square" },
+      { frequency: 1320, offset: 0.13, duration: 0.14, gain: 0.62, type: "square" },
     ],
-    rest: [{ frequency: 392, offset: 0, duration: 0.15, gain: 0.22 }],
+    rest: [{ frequency: 520, offset: 0, duration: 0.18, gain: 0.48, type: "triangle" }],
     finish: [
-      { frequency: 523.25, offset: 0, duration: 0.11, gain: 0.28 },
-      { frequency: 659.25, offset: 0.12, duration: 0.11, gain: 0.3 },
-      { frequency: 783.99, offset: 0.24, duration: 0.16, gain: 0.32 },
+      { frequency: 784, offset: 0, duration: 0.12, gain: 0.66, type: "square" },
+      { frequency: 988, offset: 0.13, duration: 0.12, gain: 0.7, type: "square" },
+      { frequency: 1318, offset: 0.27, duration: 0.2, gain: 0.74, type: "square" },
     ],
   };
 
@@ -829,12 +830,12 @@ function playCue(type) {
   sequences[type].forEach((note) => {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.type = type === "rest" ? "sine" : "triangle";
+    oscillator.type = note.type;
     oscillator.frequency.value = note.frequency;
     oscillator.connect(gain);
     gain.connect(context.destination);
     const start = now + note.offset;
-    const peakGain = Math.max(0.0001, note.gain * state.cueVolume);
+    const peakGain = Math.max(0.0001, Math.min(1.4, note.gain * state.cueVolume));
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(peakGain, start + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + note.duration);
@@ -906,7 +907,7 @@ elements.soundButton.addEventListener("click", () => {
 });
 
 elements.volumeSlider.addEventListener("input", () => {
-  state.cueVolume = clampUnit(Number(elements.volumeSlider.value) / 100);
+  state.cueVolume = clampCueVolume(Number(elements.volumeSlider.value) / 100);
   if (state.cueVolume > 0) {
     state.soundEnabled = true;
   }

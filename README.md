@@ -9,7 +9,7 @@ Installable single-page PWA for PT holds, mobility blocks, HIIT intervals, and q
 - Presets: PT, mobility, core, strength, HIIT, conditioning, recovery, and quick custom.
 - Favorites: saved in `localStorage`.
 - Cues: Web Audio start/rest/finish sounds plus vibration where supported.
-- Cue volume: adjustable and saved locally for use over background music.
+- Cue volume: boosted, adjustable up to 200%, and saved locally for use over background music.
 - Screen-on mode: uses the Screen Wake Lock API when available.
 - Music-friendly audio: uses short Web Audio cues and avoids long-running hidden media playback so background music is less likely to be interrupted.
 
