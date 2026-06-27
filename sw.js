@@ -7,6 +7,20 @@ const APP_SHELL = [
   "manifest.webmanifest",
   "assets/icon.svg",
 ];
+const APP_SHELL_URLS = new Set(APP_SHELL.map((path) => new URL(path, self.registration.scope).href));
+
+function cacheAppShellResponse(request, response) {
+  if (!response.ok || response.type !== "basic") {
+    return Promise.resolve(response);
+  }
+
+  const copy = response.clone();
+  return caches
+    .open(CACHE_NAME)
+    .then((cache) => cache.put(request, copy))
+    .catch(() => {})
+    .then(() => response);
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -33,23 +47,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+  if (url.origin !== location.origin) {
+    return;
+  }
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match("index.html").then((cached) => cached || Response.error())),
+    );
+    return;
+  }
+
+  if (!APP_SHELL_URLS.has(url.href)) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() =>
-        caches.match(event.request).then((cached) => {
-          if (cached) {
-            return cached;
-          }
-          if (event.request.mode === "navigate") {
-            return caches.match("index.html");
-          }
-          return Response.error();
-        }),
-      ),
+      .then((response) => cacheAppShellResponse(event.request, response))
+      .catch(() => caches.match(event.request).then((cached) => cached || Response.error())),
   );
 });

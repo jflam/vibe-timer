@@ -1,5 +1,7 @@
 const ringCircumference = 2 * Math.PI * 52;
 const maxCueVolume = 2;
+const fallbackPanelColor = "#d94f66";
+const fallbackPresetColor = "#0f776e";
 
 const presets = [
   {
@@ -286,34 +288,34 @@ const presets = [
 ];
 
 const elements = {
-  presetName: document.querySelector("#presetName"),
-  favoriteButton: document.querySelector("#favoriteButton"),
-  timeRemaining: document.querySelector("#timeRemaining"),
-  phaseName: document.querySelector("#phaseName"),
-  roundInfo: document.querySelector("#roundInfo"),
-  elapsedTime: document.querySelector("#elapsedTime"),
-  totalTime: document.querySelector("#totalTime"),
-  remainingTime: document.querySelector("#remainingTime"),
-  progressCircle: document.querySelector("#progressCircle"),
-  startPauseButton: document.querySelector("#startPauseButton"),
-  startPauseIcon: document.querySelector("#startPauseIcon use"),
-  startPauseLabel: document.querySelector("#startPauseLabel"),
-  restartButton: document.querySelector("#restartButton"),
-  previousPhaseButton: document.querySelector("#previousPhaseButton"),
-  nextPhaseButton: document.querySelector("#nextPhaseButton"),
-  soundButton: document.querySelector("#soundButton"),
-  wakeButton: document.querySelector("#wakeButton"),
-  volumeSlider: document.querySelector("#volumeSlider"),
-  volumeValue: document.querySelector("#volumeValue"),
-  supportLine: document.querySelector("#supportLine"),
-  favoritesOnlyButton: document.querySelector("#favoritesOnlyButton"),
-  presetSearch: document.querySelector("#presetSearch"),
-  categoryTabs: document.querySelector("#categoryTabs"),
-  presetList: document.querySelector("#presetList"),
-  customForm: document.querySelector("#customForm"),
-  customWork: document.querySelector("#customWork"),
-  customRest: document.querySelector("#customRest"),
-  customRounds: document.querySelector("#customRounds"),
+  presetName: requiredElement("#presetName"),
+  favoriteButton: requiredElement("#favoriteButton"),
+  timeRemaining: requiredElement("#timeRemaining"),
+  phaseName: requiredElement("#phaseName"),
+  roundInfo: requiredElement("#roundInfo"),
+  elapsedTime: requiredElement("#elapsedTime"),
+  totalTime: requiredElement("#totalTime"),
+  remainingTime: requiredElement("#remainingTime"),
+  progressCircle: requiredElement("#progressCircle"),
+  startPauseButton: requiredElement("#startPauseButton"),
+  startPauseIcon: requiredElement("#startPauseIcon use"),
+  startPauseLabel: requiredElement("#startPauseLabel"),
+  restartButton: requiredElement("#restartButton"),
+  previousPhaseButton: requiredElement("#previousPhaseButton"),
+  nextPhaseButton: requiredElement("#nextPhaseButton"),
+  soundButton: requiredElement("#soundButton"),
+  wakeButton: requiredElement("#wakeButton"),
+  volumeSlider: requiredElement("#volumeSlider"),
+  volumeValue: requiredElement("#volumeValue"),
+  supportLine: requiredElement("#supportLine"),
+  favoritesOnlyButton: requiredElement("#favoritesOnlyButton"),
+  presetSearch: requiredElement("#presetSearch"),
+  categoryTabs: requiredElement("#categoryTabs"),
+  presetList: requiredElement("#presetList"),
+  customForm: requiredElement("#customForm"),
+  customWork: requiredElement("#customWork"),
+  customRest: requiredElement("#customRest"),
+  customRounds: requiredElement("#customRounds"),
 };
 
 const storage = {
@@ -325,10 +327,10 @@ const storage = {
 
 const memoryStorage = new Map();
 const defaultFavorites = new Set(presets.filter((preset) => preset.favorite).map((preset) => preset.id));
-const savedFavorites = safeJson(readStoredValue(storage.favorites), [...defaultFavorites]);
-const savedSettings = safeJson(readStoredValue(storage.settings), {});
+const savedFavorites = parseStoredFavorites(readStoredValue(storage.favorites), [...defaultFavorites]);
+const savedSettings = parseStoredSettings(readStoredValue(storage.settings));
 const savedPresetId = readStoredValue(storage.lastPreset);
-const savedFavoritesVersion = Number(readStoredValue(storage.favoritesVersion) ?? 0);
+const savedFavoritesVersion = parseStoredVersion(readStoredValue(storage.favoritesVersion));
 const initialFavorites = new Set(savedFavorites);
 if (savedFavoritesVersion < 2) {
   ["pt-10-5-10", "timer-30", "pt-5-5-10"].forEach((id) => initialFavorites.add(id));
@@ -348,25 +350,79 @@ const state = {
   query: "",
   favorites: initialFavorites,
   soundEnabled: savedSettings.soundEnabled ?? true,
-  cueVolume: clampCueVolume(Number(savedSettings.cueVolume ?? 1)),
+  cueVolume: savedSettings.cueVolume ?? 1,
   wakeWanted: savedSettings.wakeWanted ?? true,
   audioContext: null,
   audioPrimedAt: 0,
   audioNeedsRearm: false,
   pageWasHidden: document.visibilityState === "hidden",
   wakeLock: null,
+  wakeLockRequestId: 0,
   rafId: null,
   supportStatus: "",
 };
 
 elements.progressCircle.style.strokeDasharray = `${ringCircumference}`;
 
-function safeJson(value, fallback) {
+function requiredElement(selector) {
+  const element = document.querySelector(selector);
+  if (!element) {
+    throw new Error(`Missing required element: ${selector}`);
+  }
+  return element;
+}
+
+function parseStoredJson(value, fallback) {
+  if (typeof value !== "string" || !value.trim()) {
+    return fallback;
+  }
   try {
-    return value ? JSON.parse(value) : fallback;
+    return JSON.parse(value);
   } catch {
     return fallback;
   }
+}
+
+function parseStoredFavorites(value, fallback) {
+  const parsed = parseStoredJson(value, fallback);
+  if (!Array.isArray(parsed)) {
+    return fallback;
+  }
+  return parsed.filter((id) => typeof id === "string" && id.length > 0 && id.length <= 120);
+}
+
+function parseStoredSettings(value) {
+  const parsed = parseStoredJson(value, {});
+  if (!isPlainObject(parsed)) {
+    return {};
+  }
+
+  const settings = {};
+  if (typeof parsed.soundEnabled === "boolean") {
+    settings.soundEnabled = parsed.soundEnabled;
+  }
+  if (typeof parsed.wakeWanted === "boolean") {
+    settings.wakeWanted = parsed.wakeWanted;
+  }
+  if (parsed.cueVolume !== undefined) {
+    const volume = Number(parsed.cueVolume);
+    if (Number.isFinite(volume)) {
+      settings.cueVolume = clampCueVolume(volume);
+    }
+  }
+  return settings;
+}
+
+function parseStoredVersion(value) {
+  const version = Number(value ?? 0);
+  if (!Number.isFinite(version) || version < 0) {
+    return 0;
+  }
+  return Math.floor(version);
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function readStoredValue(key) {
@@ -453,7 +509,7 @@ function loadPreset(preset, options = {}) {
   state.elapsedWhenPaused = 0;
   state.lastPhaseIndex = 0;
   state.complete = false;
-  document.documentElement.style.setProperty("--panel", preset.color);
+  document.documentElement.style.setProperty("--panel", safeColor(preset.color, fallbackPanelColor));
   writeStoredValue(storage.lastPreset, preset.id);
   render();
   renderPresets();
@@ -484,7 +540,7 @@ function makeCustomPreset() {
     rounds,
     intervals,
     dropFinalRest: true,
-    color: "#0f776e",
+    color: fallbackPresetColor,
     tags: [`${work}s`, `${rest}s rest`, `${rounds} reps`],
   };
 }
@@ -494,6 +550,22 @@ function clampNumber(value, min, max) {
     return min;
   }
   return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function safeColor(value, fallback = fallbackPresetColor) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const color = value.trim();
+  return /^#[\da-f]{3}([\da-f]{3})?$/i.test(color) ? color : fallback;
+}
+
+function appendIconUse(container, symbolId) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", symbolId);
+  svg.append(use);
+  container.append(svg);
 }
 
 function getElapsed() {
@@ -526,9 +598,9 @@ function startTimer() {
     state.lastPhaseIndex = 0;
   }
 
-  requestWakeLock();
   state.running = true;
   state.startedAt = performance.now();
+  void requestWakeLock();
   const { index, phase } = getCurrentPhase();
   state.lastPhaseIndex = index;
   void playCue(phase?.kind === "rest" ? "rest" : "work");
@@ -543,7 +615,7 @@ function pauseTimer(options = {}) {
   state.elapsedWhenPaused = getElapsed();
   state.running = false;
   cancelAnimationFrame(state.rafId);
-  releaseWakeLock();
+  void releaseWakeLock();
   if (!options.silent) {
     vibrate(20);
   }
@@ -607,7 +679,7 @@ function tick() {
     state.elapsedWhenPaused = state.totalSeconds;
     state.running = false;
     cancelAnimationFrame(state.rafId);
-    releaseWakeLock();
+    void releaseWakeLock();
     void playCue("finish");
     vibrate([90, 45, 90]);
   }
@@ -694,7 +766,7 @@ function wakeStatusText() {
 
 function renderCategories() {
   const categories = ["All", ...new Set(presets.map((preset) => preset.category)), "Custom"];
-  elements.categoryTabs.innerHTML = "";
+  elements.categoryTabs.replaceChildren();
   categories.forEach((category) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -718,12 +790,12 @@ function renderPresets() {
   const filtered = availablePresets.filter((preset) => {
     const matchesCategory = state.selectedCategory === "All" || preset.category === state.selectedCategory;
     const matchesFavorite = !state.showFavoritesOnly || state.favorites.has(preset.id);
-    const haystack = [preset.name, preset.category, preset.summary, ...preset.tags].join(" ").toLowerCase();
+    const haystack = [preset.name, preset.category, preset.summary, ...presetTags(preset)].join(" ").toLowerCase();
     const matchesQuery = !query || haystack.includes(query);
     return matchesCategory && matchesFavorite && matchesQuery;
   });
 
-  elements.presetList.innerHTML = "";
+  elements.presetList.replaceChildren();
 
   if (!filtered.length) {
     const empty = document.createElement("div");
@@ -741,20 +813,39 @@ function renderPresets() {
     card.type = "button";
     card.className = "preset-card";
     card.classList.toggle("active", preset.id === state.activePreset.id);
-    card.style.setProperty("--preset-color", preset.color);
-    card.innerHTML = `
-      <span class="preset-swatch" aria-hidden="true"></span>
-      <span class="preset-copy">
-        <strong>${escapeHtml(preset.name)}</strong>
-        <span>${escapeHtml(preset.summary)}</span>
-        <span class="preset-meta">${preset.tags.map((tag) => `<b>${escapeHtml(tag)}</b>`).join("")}</span>
-      </span>
-      <span class="icon-button preset-fave ${state.favorites.has(preset.id) ? "active" : ""}" aria-hidden="true">
-        <svg><use href="#icon-star"></use></svg>
-      </span>
-    `;
+    card.style.setProperty("--preset-color", safeColor(preset.color));
+
+    const swatch = document.createElement("span");
+    swatch.className = "preset-swatch";
+    swatch.setAttribute("aria-hidden", "true");
+
+    const copy = document.createElement("span");
+    copy.className = "preset-copy";
+
+    const title = document.createElement("strong");
+    title.textContent = preset.name;
+
+    const summary = document.createElement("span");
+    summary.textContent = preset.summary;
+
+    const meta = document.createElement("span");
+    meta.className = "preset-meta";
+    presetTags(preset).forEach((tagText) => {
+      const tag = document.createElement("b");
+      tag.textContent = tagText;
+      meta.append(tag);
+    });
+
+    const favoriteIcon = document.createElement("span");
+    favoriteIcon.className = "icon-button preset-fave";
+    favoriteIcon.classList.toggle("active", state.favorites.has(preset.id));
+    favoriteIcon.setAttribute("aria-hidden", "true");
+    appendIconUse(favoriteIcon, "#icon-star");
+
+    copy.append(title, summary, meta);
+    card.append(swatch, copy, favoriteIcon);
     card.addEventListener("click", (event) => {
-      const faveTarget = event.target.closest(".preset-fave");
+      const faveTarget = event.target instanceof Element ? event.target.closest(".preset-fave") : null;
       if (faveTarget) {
         toggleFavorite(preset.id);
         return;
@@ -765,16 +856,8 @@ function renderPresets() {
   });
 }
 
-function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, (character) => {
-    return {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;",
-    }[character];
-  });
+function presetTags(preset) {
+  return Array.isArray(preset.tags) ? preset.tags.filter((tag) => typeof tag === "string") : [];
 }
 
 function toggleFavorite(id = state.activePreset.id) {
@@ -967,7 +1050,7 @@ function handlePageRestored() {
   }
 
   if (state.running && state.wakeWanted) {
-    requestWakeLock();
+    void requestWakeLock();
   }
 }
 
@@ -978,22 +1061,43 @@ function vibrate(pattern) {
 }
 
 async function requestWakeLock() {
-  if (!state.wakeWanted || !("wakeLock" in navigator) || document.visibilityState !== "visible") {
+  const requestId = state.wakeLockRequestId + 1;
+  state.wakeLockRequestId = requestId;
+
+  if (state.wakeLock) {
+    render();
+    return;
+  }
+
+  if (!state.running || !state.wakeWanted || !("wakeLock" in navigator) || document.visibilityState !== "visible") {
     render();
     return;
   }
 
   try {
-    state.wakeLock = await navigator.wakeLock.request("screen");
-    state.wakeLock.addEventListener("release", () => {
-      state.wakeLock = null;
-      render();
+    const wakeLock = await navigator.wakeLock.request("screen");
+    if (
+      requestId !== state.wakeLockRequestId ||
+      !state.running ||
+      !state.wakeWanted ||
+      document.visibilityState !== "visible"
+    ) {
+      await wakeLock.release().catch(() => {});
+      return;
+    }
+
+    state.wakeLock = wakeLock;
+    wakeLock.addEventListener("release", () => {
+      if (state.wakeLock === wakeLock) {
+        state.wakeLock = null;
+        render();
+      }
     });
     if (!state.audioNeedsRearm) {
       state.supportStatus = "";
     }
   } catch (error) {
-    if (!state.audioNeedsRearm) {
+    if (requestId === state.wakeLockRequestId && !state.audioNeedsRearm) {
       state.supportStatus = `Wake lock unavailable: ${error.name}`;
     }
   }
@@ -1001,14 +1105,19 @@ async function requestWakeLock() {
 }
 
 async function releaseWakeLock() {
-  if (!state.wakeLock) {
+  state.wakeLockRequestId += 1;
+  const wakeLock = state.wakeLock;
+  state.wakeLock = null;
+  if (!wakeLock) {
+    render();
     return;
   }
   try {
-    await state.wakeLock.release();
+    await wakeLock.release();
   } catch {
-    state.wakeLock = null;
+    // Wake locks can already be released by the browser between state checks.
   }
+  render();
 }
 
 function installServiceWorker() {
@@ -1055,9 +1164,9 @@ elements.volumeSlider.addEventListener("change", () => {
 elements.wakeButton.addEventListener("click", () => {
   state.wakeWanted = !state.wakeWanted;
   if (state.wakeWanted && state.running) {
-    requestWakeLock();
+    void requestWakeLock();
   } else {
-    releaseWakeLock();
+    void releaseWakeLock();
   }
   saveSettings();
   render();
