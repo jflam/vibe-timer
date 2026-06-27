@@ -352,6 +352,8 @@ const state = {
   wakeWanted: savedSettings.wakeWanted ?? true,
   audioContext: null,
   audioPrimedAt: 0,
+  audioNeedsRearm: false,
+  pageWasHidden: document.visibilityState === "hidden",
   wakeLock: null,
   rafId: null,
   supportStatus: "",
@@ -801,6 +803,7 @@ function createAudioContext() {
   const context = new AudioEngine();
   context.addEventListener?.("statechange", () => {
     if (state.audioContext === context && context.state === "interrupted") {
+      state.audioNeedsRearm = true;
       state.supportStatus = "Audio interrupted. Tap any control to re-arm sound.";
       render();
     }
@@ -818,7 +821,28 @@ function disposeAudioContext() {
   }
 }
 
-function unlockAudio({ recreate = true } = {}) {
+function clearAudioStatus() {
+  if (state.supportStatus.startsWith("Audio ") || state.supportStatus.startsWith("Tap ")) {
+    state.supportStatus = "";
+    render();
+  }
+}
+
+function markAudioReady() {
+  state.audioPrimedAt = Date.now();
+  state.audioNeedsRearm = false;
+  clearAudioStatus();
+}
+
+function markAudioNeedsRearm(message = "") {
+  state.audioNeedsRearm = true;
+  if (message) {
+    state.supportStatus = message;
+    render();
+  }
+}
+
+async function unlockAudio({ recreate = true } = {}) {
   if (!state.soundEnabled || state.cueVolume <= 0) {
     return null;
   }
@@ -833,51 +857,55 @@ function unlockAudio({ recreate = true } = {}) {
     return null;
   }
 
-  if (context.state !== "running") {
-    try {
-      const resumePromise = context.resume?.();
-      resumePromise
-        ?.then?.(() => {
-          state.audioPrimedAt = Date.now();
-          if (state.supportStatus.startsWith("Audio ") || state.supportStatus.startsWith("Tap ")) {
-            state.supportStatus = "";
-            render();
-          }
-        })
-        ?.catch?.(() => {
-          if (!recreate) {
-            return;
-          }
-          disposeAudioContext();
-          createAudioContext()?.resume?.().catch?.(() => {});
-        });
-    } catch {
-      if (recreate) {
-        disposeAudioContext();
-        context = createAudioContext();
-      }
+  for (let attempt = 0; attempt < (recreate ? 2 : 1); attempt += 1) {
+    if (context.state === "running") {
+      markAudioReady();
+      return context;
     }
-  } else {
-    state.audioPrimedAt = Date.now();
-    if (state.supportStatus.startsWith("Audio ") || state.supportStatus.startsWith("Tap ")) {
-      state.supportStatus = "";
-      render();
+
+    try {
+      await context.resume?.();
+    } catch {
+      // Safari can reject resume after backgrounding until the next user gesture.
+    }
+
+    if (context.state === "running") {
+      markAudioReady();
+      return context;
+    }
+
+    if (!recreate || attempt === 1) {
+      break;
+    }
+
+    disposeAudioContext();
+    context = createAudioContext();
+    if (!context) {
+      return null;
     }
   }
 
-  return context;
+  if (state.running) {
+    markAudioNeedsRearm("Tap any control to re-arm sound.");
+  }
+  return null;
 }
 
-function primeAudioFromGesture() {
-  unlockAudio();
+async function primeAudioFromGesture() {
+  await unlockAudio();
 }
 
-function playCue(type) {
+async function playCue(type, options = {}) {
   if (!state.soundEnabled || state.cueVolume <= 0) {
     return;
   }
-  const context = unlockAudio();
+  const context = options.context ?? (await unlockAudio());
   if (!context) {
+    return;
+  }
+
+  if (context.state !== "running") {
+    markAudioNeedsRearm("Tap any control to re-arm sound.");
     return;
   }
 
@@ -913,8 +941,33 @@ function playCue(type) {
     });
   } catch {
     disposeAudioContext();
-    state.supportStatus = "Audio reset. Tap Start to re-arm sound.";
-    render();
+    markAudioNeedsRearm("Audio reset. Tap any control to re-arm sound.");
+  }
+}
+
+function handlePageHidden() {
+  state.pageWasHidden = true;
+  if (state.audioContext) {
+    markAudioNeedsRearm();
+    disposeAudioContext();
+  }
+}
+
+function handlePageRestored() {
+  if (document.visibilityState === "hidden") {
+    return;
+  }
+
+  const wasHidden = state.pageWasHidden;
+  state.pageWasHidden = false;
+
+  if (wasHidden && state.running) {
+    markAudioNeedsRearm("Tap any control to re-arm sound.");
+    void unlockAudio({ recreate: false });
+  }
+
+  if (state.running && state.wakeWanted) {
+    requestWakeLock();
   }
 }
 
@@ -936,9 +989,13 @@ async function requestWakeLock() {
       state.wakeLock = null;
       render();
     });
-    state.supportStatus = "";
+    if (!state.audioNeedsRearm) {
+      state.supportStatus = "";
+    }
   } catch (error) {
-    state.supportStatus = `Wake lock unavailable: ${error.name}`;
+    if (!state.audioNeedsRearm) {
+      state.supportStatus = `Wake lock unavailable: ${error.name}`;
+    }
   }
   render();
 }
@@ -1029,19 +1086,16 @@ elements.customForm.addEventListener("submit", (event) => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
-    disposeAudioContext();
+    handlePageHidden();
     return;
   }
 
-  if (state.running) {
-    state.supportStatus = "Tap any control to re-arm sound.";
-    render();
-  }
-
-  if (state.running && state.wakeWanted) {
-    requestWakeLock();
-  }
+  handlePageRestored();
 });
+
+window.addEventListener("pagehide", handlePageHidden);
+window.addEventListener("pageshow", handlePageRestored);
+window.addEventListener("focus", handlePageRestored);
 
 if ("PointerEvent" in window) {
   document.addEventListener("pointerdown", primeAudioFromGesture, { capture: true, passive: true });
