@@ -4,6 +4,45 @@ const warmupSeconds = 5;
 const fallbackPanelColor = "#d94f66";
 const fallbackPresetColor = "#0f776e";
 
+// Per-category palettes. Loading a preset retints the whole app:
+//   panel      -> top of the timer gradient (where the big time sits)
+//   panelDark  -> bottom of the timer gradient
+//   panelDeep  -> the darker control-deck zone
+//   accent     -> preset-panel accents (eyebrow, active tab, Load, swatch)
+const themes = {
+  // Coral — warm, encouraging, clinical-but-kind (the original).
+  PT: { panel: "#d94f66", panelDark: "#c2475c", panelDeep: "#9c3548", accent: "#0f776e" },
+  // Tangerine — bright, snappy, go-now energy.
+  Quick: { panel: "#f15f2c", panelDark: "#e0481b", panelDeep: "#b23a12", accent: "#c2410c" },
+  // Electric indigo — flowing, deep, unhurried.
+  Mobility: { panel: "#6a5cf0", panelDark: "#5343d6", panelDeep: "#3c2fa6", accent: "#4f46e5" },
+  // Deep jade — grounded, stable, athletic.
+  Core: { panel: "#0d8f66", panelDark: "#0a7350", panelDeep: "#064e3b", accent: "#047857" },
+  // Graphite + gold — heavy iron, premium.
+  Strength: { panel: "#2f343d", panelDark: "#1f242b", panelDeep: "#13161b", accent: "#b45309" },
+  // Fire red — maximum effort, intense.
+  HIIT: { panel: "#f04438", panelDark: "#d92d20", panelDeep: "#911c14", accent: "#b91c1c" },
+  // Ocean blue — endurance, breath, cardio.
+  Conditioning: { panel: "#2f74e8", panelDark: "#1d4ed8", panelDeep: "#1a3a9c", accent: "#1d4ed8" },
+  // Twilight mauve — restful, calm, breathe down.
+  Recovery: { panel: "#6d6196", panelDark: "#534878", panelDeep: "#3a3056", accent: "#7a5ea8" },
+  // Slate — neutral, your own.
+  Custom: { panel: "#3f4654", panelDark: "#2c313b", panelDeep: "#1d2128", accent: "#475569" },
+};
+
+function themeFor(category) {
+  return themes[category] || themes.Custom;
+}
+
+function applyTheme(preset) {
+  const theme = themeFor(preset.category);
+  const root = document.documentElement.style;
+  root.setProperty("--panel", theme.panel);
+  root.setProperty("--panel-dark", theme.panelDark);
+  root.setProperty("--panel-deep", theme.panelDeep);
+  root.setProperty("--accent", theme.accent);
+}
+
 const presets = [
   {
     id: "pt-10-5-10",
@@ -523,7 +562,7 @@ function loadPreset(preset, options = {}) {
   state.elapsedWhenPaused = 0;
   state.lastPhaseIndex = 0;
   state.complete = false;
-  document.documentElement.style.setProperty("--panel", safeColor(preset.color, fallbackPanelColor));
+  applyTheme(preset);
   writeStoredValue(storage.lastPreset, preset.id);
   render();
   renderPresets();
@@ -885,7 +924,7 @@ function renderPresets() {
     card.type = "button";
     card.className = "preset-card";
     card.classList.toggle("active", preset.id === state.activePreset.id);
-    card.style.setProperty("--preset-color", safeColor(preset.color));
+    card.style.setProperty("--preset-color", themeFor(preset.category).panel);
 
     const swatch = document.createElement("span");
     swatch.className = "preset-swatch";

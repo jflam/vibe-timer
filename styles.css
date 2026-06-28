@@ -5,11 +5,11 @@
   --faint: rgba(255, 255, 255, 0.55);
   --panel: #d94f66;
   --panel-dark: #c2475c;
-  --panel-deep: #a9394d;
+  --panel-deep: #9c3548;
   --line: rgba(255, 255, 255, 0.22);
   --white: #ffffff;
   --paper: #f6f4ef;
-  --teal: #0f776e;
+  --accent: #0f776e;
   --amber: #f3bd47;
   --blue: #3d77d9;
   --gutter: 1.9rem;
@@ -32,7 +32,7 @@ body {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 20% 10%, rgba(15, 119, 110, 0.18), transparent 28rem),
+    radial-gradient(circle at 20% 10%, rgba(23, 24, 28, 0.06), transparent 28rem),
     linear-gradient(140deg, #fffaf2, #f7eef0 48%, #eef5f4);
   color: var(--ink);
   -webkit-text-size-adjust: 100%;
@@ -75,6 +75,7 @@ button {
   background: linear-gradient(180deg, var(--panel), var(--panel-dark));
   box-shadow: var(--shadow);
   color: var(--white);
+  transition: background 360ms ease;
 }
 
 .timer-topbar {
@@ -256,7 +257,12 @@ button {
   gap: 1.15rem;
   justify-items: center;
   padding: 1.9rem var(--gutter) calc(1.4rem + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(163, 57, 77, 0.42), rgba(132, 45, 62, 0.66));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--panel-deep) 22%, transparent),
+    var(--panel-deep)
+  );
+  transition: background 360ms ease;
 }
 
 .ring-wrap {
@@ -375,7 +381,8 @@ button {
 
 .eyebrow {
   display: block;
-  color: var(--teal);
+  color: var(--accent);
+  transition: color 360ms ease;
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -462,8 +469,8 @@ button {
 
 .category-tab.active {
   border-color: transparent;
-  background: rgba(15, 119, 110, 0.12);
-  color: var(--teal);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
 }
 
 .preset-list {
@@ -491,8 +498,8 @@ button {
 }
 
 .preset-card.active {
-  border-color: rgba(15, 119, 110, 0.38);
-  box-shadow: 0 0 0 3px rgba(15, 119, 110, 0.12);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .preset-swatch {
@@ -597,9 +604,10 @@ button {
   min-height: 2.4rem;
   border: 0;
   border-radius: 8px;
-  background: var(--teal);
+  background: var(--accent);
   color: #fff;
   font-weight: 900;
+  transition: background 360ms ease;
 }
 
 .update-stamp {
